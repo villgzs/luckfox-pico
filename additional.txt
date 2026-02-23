@@ -19,7 +19,7 @@
 
 [Journal]
 #Storage=auto
-**Storage=none**  
+Storage=none  
 #Compress=yes
 #Seal=yes
 #SplitMode=uid
@@ -31,7 +31,7 @@
 #SystemMaxFileSize=
 #SystemMaxFiles=100
 #RuntimeMaxUse=
-**RuntimeMaxUse=5M**  
+RuntimeMaxUse=5M
 #RuntimeKeepFree=
 #RuntimeMaxFileSize=
 #RuntimeMaxFiles=100
