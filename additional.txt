@@ -48,6 +48,8 @@ RuntimeMaxUse=5M
 #MaxLevelConsole=info
 #MaxLevelWall=emerg
 #LineMax=48K
+#ReadKMsg=yes
+#Audit=no
 
 -----------------------------------------------
 
@@ -55,5 +57,5 @@ ln -sf /usr/share/zoneinfo/Europe/Budapest /etc/localtime
 echo "Europe/Budapest" > /etc/timezone
 
 ------------------------------------------------
-#ReadKMsg=yes
-#Audit=no
+
+
