@@ -58,4 +58,111 @@ echo "Europe/Budapest" > /etc/timezone
 
 ------------------------------------------------
 
+ln -s /dev/null ~/luckfox/etc/systemd/system/serial-getty@ttyFIQ0.service
+# ADBD maszkolása
+ln -s /dev/null ~/luckfox/etc/systemd/system/adbd.service
+
+# User-level systemd maszkolása (hogy ne egyen meg 8MB-ot)
+ln -s /dev/null ~/luckfox/etc/systemd/system/user@1000.service
+
+# DBus maszkolása (ha tényleg nincs rá szükséged)
+ln -s /dev/null ~/luckfox/etc/systemd/system/dbus.service
+
+~/luckfox/etc/systemd/journald.conf
+[Journal]
+Storage=volatile
+RuntimeMaxUse=2M
+
+systemctl status serial-getty@ttyFIQ0.service
+
+# WPA Supplicant maszkolása (hogy se D-Bus, se hálózat ne tudja elindítani)
+sudo rm dbus-fi.w1.wpa_supplicant1.service
+sudo ln -s /dev/null dbus-fi.w1.wpa_supplicant1.service
+
+# ModemManager maszkolása (felesleges mobilnet-kezelő)
+sudo rm dbus-org.freedesktop.ModemManager1.service
+sudo ln -s /dev/null dbus-org.freedesktop.ModemManager1.service
+
+# NetworkManager diszpécser (ha csak fix IP-t vagy sima DHCP-t használsz, ez nem kell)
+sudo rm dbus-org.freedesktop.nm-dispatcher.service
+sudo ln -s /dev/null dbus-org.freedesktop.nm-dispatcher.service
+
+2. Takarítás a ".wants" mappákban
+A Systemd a multi-user.target.wants mappában tárolja azokat a szolgáltatásokat, amiknek mindenképpen el kell indulniuk bootoláskor. Érdemes oda is benézni:
+
+Bash
+ls multi-user.target.wants/
+sudo rm multi-user.target.wants/wpa_supplicant.service
+sudo rm multi-user.target.wants/NetworkManager.service
+
+~/luckfox/etc/systemd/system/multi-user.target.wants/
+sudo rm wpa_supplicant.service ModemManager.service NetworkManager.service networkd-dispatcher.service vsftpd.service e2scrub_reap.service rsyslog.service
+
+sudo rm sysinit.target.wants/systemd-pstore.service
+
+sudo rm getty.target.wants/getty@tty1.service
+
+--------------------------------------------------------
+
+~/luckfox/etc/network/interfaces
+
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+
+--------------------------------------------------------
+
+~/luckfox/etc/network/interfaces
+
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+    address 192.168.0.2
+    netmask 255.255.255.0
+    gateway 192.168.0.1
+    hwaddress ether 00:11:22:33:44:55
+
+--------------------------------------------------------
+etc/network
+
+sudo rm if-down.d/wpasupplicant
+sudo rm if-post-down.d/wpasupplicant
+sudo rm if-pre-up.d/wpasupplicant
+sudo rm if-up.d/wpasupplicant
+
+--------------------------------------------------------
+
+sudo rm resolv.conf
+sudo nano resolv.conf
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+
+--------------------------------------------------------
+
+# Lépj be a systemd könyvtárba
+cd ~/luckfox/etc/systemd/system/
+
+# Maszkold a Polkitet
+sudo ln -s /dev/null polkit.service
+
+sudo rm syslog.service
+sudo ln -s /dev/null syslog.service
+
+--------------------------------------------------------
+
+sudo rm dbus-org.freedesktop.resolve1.service
+sudo ln -s /dev/null dbus-org.freedesktop.resolve1.service
+
+--------------------------------------------------------
+
+
+
+
+
+
+
 
