@@ -178,6 +178,26 @@ sudo rm paths.target.wants/acpid.path
 sudo rm network-online.target.wants/NetworkManager-wait-online.service
 
 
+--------------------------------------------------------------------
+
+/etc/rc.local
+
+# if [ "$usb_mode" = "peripheral" ];then
+#        usb_reset &
+# fi
+
+---------------------------------------------------------------------
+
+# A D-Bus leállítása (már nincs rá szükségünk)
+sudo systemctl mask dbus.service
+sudo systemctl mask dbus.socket
+
+# A felhasználói környezet (pico user systemd) letiltása
+sudo systemctl mask user@1000.service
+
+-------------------------------------------------------------------
+
+sudo mount -o remount,size=20M /run
 
 
 
