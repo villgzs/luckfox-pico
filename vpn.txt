@@ -1,0 +1,195 @@
+1. Port Forwarding beállítása (PICO oldal)
+A routered admin felületén irányítsd át az UDP 51820-as portot a PICO belső IP címére.
+
+Fontos: A WireGuard UDP-t használ, nem TCP-t!
+
+-----------------------------------------------------
+
+2. PICO (Szerver) konfiguráció
+Fájl: /etc/wireguard/wg0.conf
+
+Ini, TOML
+[Interface]
+Address = 10.0.0.1/24
+ListenPort = 51820
+PrivateKey = <PICO_PRIVAT_KULCS>
+
+# Ez a B_COMPUTER (Kliens)
+[Peer]
+PublicKey = <B_COMPUTER_PUBLIKUS_KULCS>
+AllowedIPs = 10.0.0.2/32
+
+
+-----------------------------------------------------
+
+3. B_COMPUTER (Kliens) konfiguráció
+Fájl: wg0.conf (Windows-on vagy Linuxon)
+
+Ini, TOML
+[Interface]
+Address = 10.0.0.2/24
+PrivateKey = <B_COMPUTER_PRIVAT_KULCS>
+
+[Peer]
+PublicKey = <PICO_PUBLIKUS_KULCS>
+# Itt a PICO routerének KÜLSŐ (Internet) IP címét add meg!
+Endpoint = <PICO_KULSO_IP>:51820
+AllowedIPs = 10.0.0.0/24
+# Ez tartja nyitva az alagutat a NAT-on keresztül:
+PersistentKeepalive = 25
+
+-------------------------------------------------------
+
+Miért a PICO legyen a szerver?
+Bár a PICO az erőforrás-szegényebb eszköz, a hálózati elrendezésed miatt ő az egyetlen, aki "hívható". Mivel a WireGuard kernel-szinten fut, a PICO észre sem fogja venni a forgalmat, amíg nem küldesz rajta gigabájtokat.
+
+Amire figyelned kell (PICO specifikus):
+Dinamikus IP: Ha a PICO routere nem fix IP-t kap a szolgáltatótól (Kábelmodemnél gyakori), akkor szükséged lesz egy DDNS-re (pl. DuckDNS vagy No-IP), és az Endpoint sorba az IP helyett a domain nevet kell írnod.
+
+Tűzfal: Ha a PICO-n fut az ufw, engedélyezd a portot:
+sudo ufw allow 51820/udp
+
+Boot sebesség: Most, hogy már szupergyors a bootod, a WireGuard indítása hozzá fog adni kb. 0.5-1 másodpercet. Ha ez zavar, használhatod a korábbi & trükköt az indításnál.
+
+----------------------------------------------------------
+
+Hogyan teszteld?
+Ha mindkét oldalon elindítottad (wg-quick up wg0), a B_COMPUTER-ről add ki ezt a parancsot:
+ping 10.0.0.1
+
+Ha válaszol a PICO, akkor a két gép egy virtuális szobába került.
+
+Szeretnéd, hogy segítsen generálni a kulcspárokat, vagy megvan a parancs hozzá?
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+
+Ez a klasszikus Site-to-Site vagy Peer-to-Peer felállás. Mivel a Pico-d memóriája véges, a cél az, hogy a VPN ne csak biztonságos legyen, hanem "láthatatlan" is a rendszererőforrások számára.
+
+A WireGuard erre a legtökéletesebb, mert nem egy központi szerveren keresztül rángatja az adatokat (mint a legtöbb kereskedelmi VPN), hanem közvetlen alagutat nyit a két gép között.
+
+A stratégia: "L2TP helyett tiszta L3 alagút"
+Ahhoz, hogy úgy lássák egymást, mintha egy szobában lennének, a következő adatokra lesz szükséged:
+
+Gép "A" (Pico): IP címe a VPN-en belül: 10.0.0.1
+
+Gép "B" (Másik gép): IP címe a VPN-en belül: 10.0.0.2
+
+1. Beállítás a Pico-n (/etc/wireguard/wg0.conf)
+Feltételezve, hogy a másik gépnek van publikus IP címe (vagy a routerén át van irányítva az 51820-as port):
+
+Ini, TOML
+[Interface]
+PrivateKey = <Pico_privát_kulcsa>
+Address = 10.0.0.1/24
+ListenPort = 51820
+
+[Peer]
+PublicKey = <Másik_gép_publikus_kulcsa>
+Endpoint = <Másik_gép_külső_IP_címe>:51820
+AllowedIPs = 10.0.0.2/32
+PersistentKeepalive = 25
+2. Beállítás a másik gépen (Gép "B")
+Ha ez egy Windowsos gép vagy egy másik Linux, a konfiguráció tükörképe lesz az előzőnek:
+
+Ini, TOML
+[Interface]
+PrivateKey = <Másik_gép_privát_kulcsa>
+Address = 10.0.0.2/24
+ListenPort = 51820
+
+[Peer]
+PublicKey = <Pico_publikus_kulcsa>
+Endpoint = <Pico_külső_IP_címe>:51820
+AllowedIPs = 10.0.0.1/32
+Miért fontos az AllowedIPs?
+Ez a beállítás mondja meg a Linuxnak, hogy ha a 10.0.0.x tartományba küldesz adatot, azt ne az interneten, hanem a VPN alagúton keresztül küldje. Így ha a Pico-n kiadod a ping 10.0.0.2 parancsot, a másik gép válaszolni fog, mintha a helyi hálózaton lenne.
+
+Mi a helyzet, ha egyik gép sem publikus? (NAT-to-NAT)
+Ez a leggyakoribb probléma: mindkét gép router mögött van, és nem tudsz portot nyitni.
+
+A rossz hír: A tiszta WireGuardhoz legalább az egyik oldalon kell egy nyitott port.
+
+A megoldás a Pico-hoz: Keress egy filléres (vagy ingyenes "Always Free") mikroszervert (pl. Oracle Cloud vagy egy kicsi VPS), ami "közvetítőként" (Relay) szolgál. Mindkét gép rácsatlakozik a szerverre, és a szerver összeköti őket.
+
+Hálózati megosztás (opcionális)
+Ha azt szeretnéd, hogy a Pico-n keresztül a hálózaton lévő többi eszközt is elérd (nem csak magát a Pico-t), akkor be kell kapcsolnod az IP forwardingot:
+
+Bash
+echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+Következő lépés:
+Van a két gép közül valamelyiknek fix publikus IP címe, vagy mindkettő otthoni/irodai router mögött van? (Ez dönti el, hogy kell-e harmadik fél a kapcsolatba.)
+
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+
+Mi a helyzet, ha okostelefon-ról szeretném megoldani a kapcsolódást a PICO-hoz?
+
+A Gemini ezt mondta:
+Ez a legjobb hír, mert a WireGuard kifejezetten "mobilbarát": nem meríti az akkumulátort (nem küld adatot, ha nincs forgalom) és pillanatok alatt újracsatlakozik, ha váltasz 4G-ről Wi-Fi-re.
+
+A telefonod ugyanolyan Kliens (Peer) lesz, mint a B_COMPUTER. A PICO-n csak annyit kell tenned, hogy hozzáadsz még egy "Peer" szekciót.
+
+1. PICO felkészítése (Szerver oldal)
+Módosítsd a /etc/wireguard/wg0.conf fájlt a PICO-n, hogy fogadni tudja a telefont:
+
+Ini, TOML
+[Interface]
+Address = 10.0.0.1/24
+ListenPort = 51820
+PrivateKey = <PICO_PRIVAT_KULCS>
+
+# Eredeti B_COMPUTER
+[Peer]
+PublicKey = <B_COMPUTER_PUBLIKUS_KULCS>
+AllowedIPs = 10.0.0.2/32
+
+# ÚJ: Okostelefon
+[Peer]
+PublicKey = <TELEFON_PUBLIKUS_KULCS>
+AllowedIPs = 10.0.0.3/32
+Mentsd el, majd indítsd újra a WireGuardot: sudo systemctl restart wg-quick@wg0.
+
+2. Okostelefon beállítása (A legegyszerűbb módszer)
+Ne gépelj a telefonon! Használd a QR-kódos módszert.
+
+Telepítsd a WireGuard appot (Play Áruház vagy App Store).
+
+Generálj egy konfigot a telefonnak a PICO-n egy ideiglenes fájlba (pl. phone.conf):
+
+Ini, TOML
+[Interface]
+Address = 10.0.0.3/24
+PrivateKey = <TELEFON_SAJAT_PRIVAT_KULCSA>
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = <PICO_PUBLIKUS_KULCSA>
+Endpoint = <PICO_KULSO_IP>:51820
+AllowedIPs = 0.0.0.0/0  # Ha mindent a VPN-en keresztül akarsz küldeni
+# VAGY: AllowedIPs = 10.0.0.0/24 # Ha csak a PICO-t akarod elérni
+PersistentKeepalive = 25
+Telepítsd a qrencode csomagot a PICO-ra:
+sudo apt install qrencode
+
+Generálj QR-kódot a terminálban:
+qrencode -t ansiutf8 < phone.conf
+
+Az appban válaszd a "+" gombot -> Scan from QR code lehetőséget, és olvasd be a terminálból.
+
+Mire tudod így használni?
+SSH a zsebedből: Bárhol vagy a világon, megnyitsz egy terminál appot a telefonon (pl. Termius vagy JuiceSSH), beírod, hogy pico@10.0.0.1, és már bent is vagy a Pico-n.
+
+Webfelület: Ha fut a Pico-n egy webszerver (pl. egy szenzoradatokat mutató Python Flask oldal), a telefon böngészőjében a http://10.0.0.1 címen eléred.
+
+Biztonság: Ha az AllowedIPs = 0.0.0.0/0 beállítást használod, a telefonod teljes internetforgalma a Pico-n (és az otthoni kábelmodemeden) keresztül megy át, ami hasznos lehet publikus Wi-Fi használatakor.
+
+Egy fontos apróság:
+A PICO kábelmodemének külső IP címe néha megváltozhat. Ha ez megtörténik, a telefon nem fogja találni a Pico-t.
+Megoldás: Használj egy ingyenes DDNS-t (pl. pico-home.duckdns.org), és a telefonon az Endpoint sorban az IP helyett ezt add meg.
+
+Szeretnéd, hogy segítsen generálni a telefonhoz szükséges kulcsokat és a konfigot?
+
+
+
