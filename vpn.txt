@@ -191,5 +191,59 @@ Megoldás: Használj egy ingyenes DDNS-t (pl. pico-home.duckdns.org), és a tele
 
 Szeretnéd, hogy segítsen generálni a telefonhoz szükséges kulcsokat és a konfigot?
 
+------------------------------------------------------------------------------------------------------------
+
+Mivel a Pico memóriája (56 MiB) rendkívül szűkös, a "kevesebb több" elve alapján kell válogatnunk. A cél, hogy a VPN-ed stabil legyen, de maradjon hely a saját alkalmazásodnak is.
+
+Itt a lista a javasolt, "Pico-barát" csomagokról:
+
+1. A VPN alapjai (WireGuard)
+Ez a legfontosabb, amit kértél. Ne telepíts nehéz kezelőfelületeket, csak az alap eszközöket:
+
+wireguard: A kernel modul és az alap parancsok.
+
+wireguard-tools: Ez tartalmazza a wg és wg-quick parancsokat.
+
+qrencode: (Opcionális) Ezzel tudsz QR-kódot rajzolni a terminálba, hogy a telefonodat 1 másodperc alatt csatlakoztasd.
+
+Bash
+sudo apt update
+sudo apt install wireguard wireguard-tools qrencode
+2. Rendszerdiagnosztika (A memória szemmel tartásához)
+Mivel optimalizáltuk a rendszert, látni akarod, ha valami "elszabadul":
+
+htop: Sokkal olvashatóbb, mint a top, és látod rajta a CPU magok terhelését is.
+
+iotop: Megmutatja, ha valami folyamatosan írja az SD kártyát (ami tönkreteheti azt).
+
+ncdu: Ha elfogyna a hely a 12G-s kártyán, ez megmutatja, melyik mappa a bűnös.
+
+Bash
+sudo apt install htop iotop ncdu
+3. Hálózati segédeszközök
+A VPN teszteléséhez és a távoli eléréshez:
+
+iputils-ping: Alapvető teszteléshez.
+
+iperf3: (Csak teszt idejére) Ezzel meg tudod mérni, mekkora a tényleges sebesség a Pico és a telefonod/PC-d között a VPN-en keresztül.
+
+tcpdump: Ha nem látják egymást a gépek, ezzel tudod "lehallgatni" a forgalmat, hogy egyáltalán megérkeznek-e a csomagok az 51820-as porton.
+
+4. Amit NE telepíts (vagy távolíts el)
+Hogy megőrizd a villámgyors boot időt és a szabad RAM-ot:
+
+Ne telepíts: NetworkManager-t (maradj az /etc/network/interfaces-nél).
+
+Ne telepíts: Docker-t (a Pico 56 MB RAM-ja ehhez nagyon kevés, a konténerek megennék reggelire).
+
+Távolítsd el, ha fent van: snapd (ez az Ubuntu legnagyobb memóriazabálója).
+
+Bash
+sudo apt purge snapd
+5. Fejlesztéshez
+Ha Pythonban írsz programot a Pico-ra, a pip helyett próbáld a rendszercsomagokat használni, vagy használj virtualenv-et, de csak nagyon célzottan.
+
+------------------------------------------------------------------------------------------------------------------------
+
 
 
