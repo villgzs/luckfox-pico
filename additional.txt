@@ -159,6 +159,23 @@ sudo ln -s /dev/null dbus-org.freedesktop.resolve1.service
 
 --------------------------------------------------------
 
+sudo rm ~/luckfox/etc/systemd/system/network-online.target.wants/NetworkManager-wait-online.service
+
+sudo rm ~/luckfox/etc/systemd/system/multi-user.target.wants/systemd-resolved.service
+
+sudo ln -s /dev/null ~/luckfox/etc/systemd/system/systemd-resolved.service
+
+sudo rm ~/luckfox/etc/systemd/system/syslog.service
+sudo ln -s /dev/null ~/luckfox/etc/systemd/system/syslog.service
+
+# Az ACPID socket (hálózati/helyi figyelő) törlése
+sudo rm sockets.target.wants/acpid.socket
+
+# Az ACPID path (fájlrendszer esemény figyelő) törlése
+sudo rm paths.target.wants/acpid.path
+
+
+sudo rm network-online.target.wants/NetworkManager-wait-online.service
 
 
 
