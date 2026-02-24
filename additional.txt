@@ -199,6 +199,37 @@ sudo systemctl mask user@1000.service
 
 sudo mount -o remount,size=20M /run
 
+--------------------------------------------------------------------
+
+# 1. fstrim végleges kiiktatása (ezzel nyersz 12 másodpercet!)
+sudo systemctl mask fstrim.service
+sudo systemctl mask fstrim.timer
+
+# 2. Felesleges karbantartó feladatok lelövése, amik bootkor futnak
+sudo systemctl mask e2scrub_all.service
+sudo systemctl mask dpkg-db-backup.service
+sudo systemctl mask logrotate.service
+
+# 3. Alsa (hang) helyreállítás - ha nincs hangszóró a Pico-n, nem kell
+sudo systemctl mask alsa-restore.service
+
+-------------------------------------------------------------------
+
+Szerkeszd a fájlt: sudo nano /etc/rc.local
+
+Ha a hardverbeállításaid már nem változnak, kommenteld ki a luckfox-config load sort.
+
+Ha nem kritikus a dátum azonnali beállítása, kommenteld ki a hwclock blokkot is.
+
+--------------------------------------------------------------------
+
+A leggyorsabb trükk:
+Ha csak a számokat akarjuk látni, tegyél egy & jelet a lassú parancsok után az /etc/rc.local-ban:
+
+Bash
+luckfox-config load &
+/oem/usr/ko/insmod_ko.sh &
+
 
 
 
