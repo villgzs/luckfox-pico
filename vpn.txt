@@ -245,5 +245,134 @@ Ha Pythonban írsz programot a Pico-ra, a pip helyett próbáld a rendszercsomag
 
 ------------------------------------------------------------------------------------------------------------------------
 
+sudo apt update
+sudo apt install wireguard-go
+
+sudo nano /etc/wireguard/wg0.conf
+
+sudo wireguard-go wg0
+
+mkdir -p /dev/net
+mknod /dev/net/tun c 10 200
+chmod 600 /dev/net/tun
+
+Ha a célod "csak" az, hogy a távoli B számítógépről elérd a Pico-t (vagy a Pico-n keresztül a B gépen futó webszervert), és a VPN-be beletört a bicskánk a hiányzó TUN driver miatt, használhatjuk az SSH Tunneling-et.
+
+Ez nem igényel semmilyen kerneltámogatást, se TUN-t, se WireGuard-ot, mert a titkosított alagutat maga az SSH protokoll építi fel "user" szinten.
+
+Hogyan irányítsd a HTTP kérést a Pico-ról a B gépre SSH-val?
+Mivel a Pico-ra be tudsz SSH-zni (vagy ő ki a B gépre), használd a Remote Port Forwarding-ot.
+
+A B gépen (ahol a webszerver fut) futtasd ezt (a Pico felé kapcsolódva):
+
+Bash
+ssh -R 8080:localhost:80 user@pico_ip_cime
+Ekkor a Pico-n megnyílik a 8080-as port, ami valójában a B gép 80-as portjára mutat.
+
+A Pico-n most már az iptables segítségével a routerről érkező kéréseket át tudod dobni a localhost:8080-ra.
+-----------------------------------------------------------------
+1. Lépés: SSH alagút felépítése (B gépről)
+A B számítógépen (ahol a weboldalad fut) add ki ezt a parancsot:
+
+Bash
+ssh -R 8080:localhost:80 user@pico_ip_cime
+-R: Remote port forwarding.
+
+8080: Ezen a porton fog figyelni a Pico.
+
+localhost:80: Ide dobja tovább a forgalmat a B gépen belül.
+
+user@pico_ip_cime: A Pico-ra jelentkezel be.
+
+Fontos: Ezt a terminált hagyd nyitva! Ha bezárod, az alagút összeomlik. (Később megmutatom, hogyan futtasd a háttérben autossh-val).
+
+
+2. Lépés: A Pico felkészítése (GatewayPorts)
+Alapértelmezésben az SSH biztonsági okokból csak a 123.0.0.1 (localhost) felől fogad kéréseket az alagúton. Hogy a routered felől (kívülről) is elérhető legyen, ezt engedélyezni kell:
+
+Szerkeszd a Pico-n az SSH konfigot:
+sudo nano /etc/ssh/sshd_config
+
+Keresd meg és állítsd be (vagy add hozzá):
+GatewayPorts yes
+
+Indítsd újra az SSH-t:
+sudo systemctl restart ssh
+
+# IP forwarding bekapcsolása (ha még nem tetted)
+sudo sysctl -w net.ipv4.ip_forward=1
+
+# Ami a Pico 80-as portjára jön, azt dobjuk át a belső 8080-asra
+sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8080
+
+-----------------------------------------------------------------
+
+Látogató -> Router (9080) -> Pico (80) -> SSH Alagút (Pico 8080) -> B Computer (80)
+
+1. Lépés: SSH alagút felépítése (B gépről)
+A B gépen add ki a parancsot, ami összeköti a Pico-t a saját webszervereddel:
+
+ssh -R 8080:localhost:80 user@pico_belso_ip_cime
+
+2. Lépés: A Pico beállítása (A "Híd")
+Mivel a kérések a Pico 80-as portjára érkeznek a routertől, de az SSH alagút a 8080-ason várja őket, a Pico-n össze kell kötnünk a kettőt.
+
+A, Engedélyezd a külső kéréseket az SSH-ban:
+Szerkeszd a Pico-n a fájlt: sudo nano /etc/ssh/sshd_config
+Állítsd be:
+
+Plaintext
+GatewayPorts yes
+Mentsd el, és indítsd újra: sudo systemctl restart ssh
+
+B, Az átirányítás beállítása (iptables):
+Futtasd a Pico-n (rootként):
+
+Bash
+# Töröljük az esetleges korábbi kísérleteket a tisztánlátás végett
+sudo iptables -t nat -F
+
+# Ami a 80-as portra érkezik, azt dobjuk át a belső 8080-asra
+sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8080
+3. Lépés: Ellenőrzés
+A Pico-n: Nézd meg, látod-e az SSH-t figyelni:
+netstat -tpln | grep 8080
+(Ha azt látod: 0.0.0.0:8080, akkor a GatewayPorts sikerült. Ha 127.0.0.1:8080, akkor csak a Pico-ról éred el.)
+
+A Routeren: Ellenőrizd a Port Forwarding szabályt:
+Külső Port: 9080 -> Pico IP: 80 (TCP)
+
+Külső teszt: Próbáld megnyitni a böngészőben:
+http://a_te_publikus_ip_cimed:9080
+
+------------------------------------------------------------
+
+Így néz ki a végleges láncolat:Látogató → Router (9080) → Pico (80) → SSH Tunel → B Computer (8080)
+
+1. Az SSH alagút indítása a B géprőlFuttasd ezt a parancsot a B számítógépen:Bash
+
+ssh -R 80:localhost:8080 user@pico_ip_cime
+
+Magyarázat:-R 80: Azt mondja a Pico-nak: "Figyelj a 80-as portodon." (Mivel a Pico-n a 80-as port szabad, és a routered oda küldi a kérést, ez a legpraktikusabb).localhost:8080: "Bármit, ami a Pico 80-asára érkezik, küldd vissza nekem ide, a saját 8080-as portomra."user@pico_ip_cime: A Pico elérhetősége.
+
+Megjegyzés: Ha a Pico-n nem root-ként vagy bejelentkezve az SSH-val, előfordulhat, hogy nem engedi a 80-as portot (1024 alatti portokhoz kiváltság kell). 
+
+Ha hibát kapsz, használd a korábbi 8080:localhost:8080 felállást, és marad az iptables REDIRECT a Pico-n.
+
+2. Ha a 80-as port "Permission Denied" (Pico oldal)
+
+Ha az SSH alagút indításakor a B gép azt írja, hogy Privileged ports can only be forwarded by root, akkor két választásod van:A) 
+
+A "tiszta" út (root SSH):Engedélyezed a Pico-n a root belépést (vagy a 80-as port használatát az SSH-nak), és így csatlakozol:ssh -R 80:localhost:8080 root@pico_ip_cimeB) 
+
+Az "átirányítós" út (Ajánlott):Maradunk a korábbi tervnél: az alagút a 8080-ason jön létre, és a Pico-n belül "kötjük át" a forgalmat a 80-asról.
+
+B gépen: ssh -R 8080:localhost:8080 user@pico_ip_cimePico-n (GatewayPorts engedélyezése után):Bash
+
+sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8080
+
+3. Ellenőrzés (Lépésről lépésre)Futtasd ezeket a Pico-n, hogy lásd, él-e a kapcsolat:Figyel-e az SSH az alagútra?netstat -tpln | grep 8080 (vagy 80, attól függően, melyiket választottad).Cél: 0.0.0.0:8080 vagy *:8080 látszódjon.Átmennek-e a csomagok?Futtasd a Pico-n: sudo tcpdump -i any port 80 or port 8080Majd próbáld megnyitni a weboldalt kívülről. Ha látsz pörgő sorokat, a csomagok megérkeztek a Pico-ra és elindultak a B gép felé.Összegzés a beállításhoz:EszközFeladatRouter9080 (külső) → Pico 80 (belső) továbbítás.PicoGatewayPorts yes az /etc/ssh/sshd_config-ban + SSH újraindítás.B Computerssh -R 8080:localhost:8080 user@pico futtatása.Picoiptables REDIRECT 80-asról 8080-asra.
+
+
 
 
