@@ -16,4 +16,111 @@ LAN 192.168.0.0/24
 WireGuard tunnel
 10.0.0.0/24
                                                                                                                                                                                         
-                                                                                                                                                                                        
+                      A router már forwardolja az UDP-t az Ubuntu (192.168.0.2) felé – ez rendben van.
+
+✅ Mit kell beállítani?
+1️⃣ IP forwarding engedélyezése az Ubuntu-n
+
+Az Ubuntu-n:
+
+sudo sysctl -w net.ipv4.ip_forward=1
+
+Tartósan:
+
+sudo nano /etc/sysctl.conf
+
+Add hozzá:
+
+net.ipv4.ip_forward=1
+
+Majd:
+
+sudo sysctl -p
+
+
+2️⃣ WireGuard szerver konfiguráció
+
+Példa /etc/wireguard/wg0.conf:
+
+[Interface]
+Address = 10.0.0.1/24
+PrivateKey = SERVER_PRIVATE_KEY
+PostUp = iptables -A FORWARD -i wg0 -o eth0 -j ACCEPT
+PostUp = iptables -A FORWARD -i eth0 -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+PostUp = iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o eth0 -j MASQUERADE
+
+PostDown = iptables -D FORWARD -i wg0 -o eth0 -j ACCEPT
+PostDown = iptables -D FORWARD -i eth0 -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o eth0 -j MASQUERADE
+
+⚠️ Ha az interfész neve nem eth0 (pl. ens18), akkor azt használd.
+
+3️⃣ A kliens oldalon
+
+A kliens WireGuard configban:
+
+[Peer]
+PublicKey = SERVER_PUBLIC_KEY
+Endpoint = FIX_IP:51820
+AllowedIPs = 192.168.0.0/24, 10.0.0.0/24
+
+Ez nagyon fontos:
+
+AllowedIPs = 192.168.0.0/24
+
+különben nem fogja a LAN felé küldeni a forgalmat.
+
+🔁 Mi történik ilyenkor?
+
+A kliens 192.168.0.x címre küld csomagot
+
+A WireGuard tunnel-en átmegy az Ubuntu szerverre
+
+Az Ubuntu NAT-olja (MASQUERADE)
+
+A LAN eszköz azt hiszi, hogy a kérés a 192.168.0.2-től jött
+
+A válasz visszamegy az Ubuntu-ra
+
+Ubuntu visszaküldi a tunnelbe
+
+🚀 Alternatív (jobb) megoldás NAT nélkül
+
+Ha nem akarsz NAT-ot, akkor:
+
+A routeren adj hozzá statikus route-ot:
+
+10.0.0.0/24 via 192.168.0.2
+
+Így a LAN eszközök tudni fogják, hogy a 10.0.0.x hálózat az Ubuntu felé érhető el.
+
+Ez tisztább megoldás, de nem minden router tud statikus route-ot.
+
+🔎 Gyors ellenőrzés
+
+Tunnel felépülése után:
+
+Ubuntu-n:
+
+sudo wg show
+
+Ping teszt:
+
+Kliensről:
+
+ping 192.168.0.1
+ping 192.168.0.100
+🎯 Összefoglalva
+
+A kulcs:
+
+IP forwarding
+
+FORWARD szabály
+
+NAT (ha nincs statikus route)
+
+kliens oldalon AllowedIPs helyes beállítása
+
+Ha szeretnéd, meg tudom írni pontosan a teljes működő configot a te IP címeiddel.
+Router típusát is megírhatod, mert az is számíthat.
