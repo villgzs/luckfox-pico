@@ -1,0 +1,19 @@
+Hálózati felépítésem a következő: internet - (fix ip)router(192.168.0.x/24) - belső hálózat. A belső hálózaton van a 2-es címen egy ubuntu, amellyel wireguard tunnelt lehet kiépíteni ( a router forward módon átküldi az UDP csomagot a 2-es címre. Azt szeretném elérni, hogy a belső hálózaton levő eszközök webes lapjait el tudjam érni a tunnel-en keresztül. A tunnel a 10.0.0.x/24 hálózatot adja.
+                                                                                                                                                                                        
+                                                                                                                                                                                        A célod röviden:
+a WireGuard tunnel (10.0.0.0/24) felől el szeretnéd érni a belső LAN (192.168.0.0/24) eszközeinek webes felületét.
+
+A topológiád:
+                                                                                                                                                                                                                                                                                                                                                                             
+Internet
+   |
+[Router - 192.168.0.1]
+   |
+LAN 192.168.0.0/24
+   |
+[Ubuntu - 192.168.0.2]
+   |
+WireGuard tunnel
+10.0.0.0/24
+                                                                                                                                                                                        
+                                                                                                                                                                                        
