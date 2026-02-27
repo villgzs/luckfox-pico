@@ -1,0 +1,54 @@
+Kártyára írás(SEEK):
+
+dd if=rootfs.img of=/dev/sdb bs=1k seek=820000
+
+Kártyáról olvasás (SKIP):
+
+dd if=/dev/sdb of=rootfs_6g.img bs=1k skip=820000 count=6291456 status=progress
+
+file rootfs_6g.img
+
+Kártyára másolás:
+
+dd if=rootfs_6g.img of=/dev/sdc bs=1k seek=820000 status=progress
+sync
+
+Javítás:
+e2fsck -f rootfs_vpn.img
+
+Méret számítás:
+resize2fs -P rootfs_vpn.img
+
+Zsugorítás:
+resize2fs -M rootfs_vpn.img
+
+Új blokk szám:
+dumpe2fs -h rootfs_vpn.img | grep "Block count"
+dumpe2fs -h rootfs_vpn.img | grep "Block size"
+
+Űj méret: új_méret = block_count × block_size
+
+Vágás új méretre:
+truncate -s ÚJ_MÉRET rootfs_vpn.img
+
+vagy:
+
+sudo mount -o loop rootfs_vpn.img /mnt
+
+Ellenőrzés: 
+file rootfs_vpn.img
+
+Kártyára írás:
+dd if=rootfs_vpn.img of=/dev/sdc bs=1k seek=820000 status=progress
+sync
+
+Ha tömörítve lesz, előtte:
+
+zerofill a szabad területet:
+dd if=/dev/zero of=zero.fill bs=1M
+rm zero.fill
+sync
+
+
+
+
